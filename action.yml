@@ -1,0 +1,106 @@
+name: 'Kustomize Inspect'
+description: 'Build and inspect a kustomize overlay to extract metadata'
+author: 'KoalaOps'
+
+branding:
+  icon: 'search'
+  color: 'purple'
+
+inputs:
+  overlay_dir:
+    description: 'Path to kustomize overlay directory'
+    required: true
+
+outputs:
+  namespace:
+    description: 'Resolved namespace (kustomization.yaml > built manifests > default)'
+    value: ${{ steps.inspect.outputs.namespace }}
+  workloads_json:
+    description: 'JSON array of workloads: [{kind,name,namespace}]'
+    value: ${{ steps.inspect.outputs.workloads_json }}
+  primary_deployment:
+    description: 'First Deployment name found (if any)'
+    value: ${{ steps.inspect.outputs.primary_deployment }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Check required tools
+      shell: bash
+      run: |
+        set -euo pipefail
+        for bin in kustomize yq; do
+          if ! command -v "$bin" >/dev/null 2>&1; then
+            echo "::error::Required tool '$bin' not found in PATH."
+            exit 1
+          fi
+        done
+        echo "✅ Tools present: kustomize, yq"
+
+    - name: Validate overlay directory
+      shell: bash
+      run: |
+        set -euo pipefail
+        OVERLAY="${{ inputs.overlay_dir }}"
+        if [ ! -d "$OVERLAY" ]; then
+          echo "::error::Overlay directory not found: $OVERLAY"
+          exit 1
+        fi
+        if [ ! -f "$OVERLAY/kustomization.yaml" ]; then
+          echo "::error::No kustomization.yaml found in $OVERLAY"
+          exit 1
+        fi
+        echo "✅ Found kustomization.yaml in: $OVERLAY"
+
+    - name: Build and inspect
+      id: inspect
+      shell: bash
+      run: |
+        set -euo pipefail
+        OVERLAY="${{ inputs.overlay_dir }}"
+
+        echo "🔨 kustomize build: $OVERLAY"
+        if ! kustomize build "$OVERLAY" > /tmp/kustomize-output.yaml 2> /tmp/kustomize.err; then
+          echo "::error::kustomize build failed"
+          sed -n '1,120p' /tmp/kustomize.err || true
+          exit 1
+        fi
+
+        # Prefer kustomization.yaml namespace; else first namespaced resource; else default
+        KUSTOM_NS="$(yq -r '.namespace // ""' "$OVERLAY/kustomization.yaml" || true)"
+        BUILT_NS="$(yq ea -r 'select(has("metadata")) | .metadata.namespace // ""' /tmp/kustomize-output.yaml | grep -m1 . || true)"
+        if [ -n "$KUSTOM_NS" ]; then
+          NAMESPACE="$KUSTOM_NS"
+        elif [ -n "$BUILT_NS" ]; then
+          NAMESPACE="$BUILT_NS"
+        else
+          NAMESPACE="default"
+        fi
+
+        # Collect workloads (Deployment, StatefulSet, DaemonSet, Job, CronJob)
+        WORKLOADS_JSON="$(
+          yq ea -o=json -I=0 '
+            [
+              select(has("kind") and has("metadata"))
+              | select(.kind=="Deployment" or .kind=="StatefulSet" or .kind=="DaemonSet" or .kind=="Job" or .kind=="CronJob")
+              | {kind: .kind, name: .metadata.name, namespace: (.metadata.namespace // "'"$NAMESPACE"'")}
+            ]' /tmp/kustomize-output.yaml
+        )"
+        WORKLOADS_JSON="$(echo "${WORKLOADS_JSON:-[]}" | tr -d '\n')"
+
+        # First deployment (if any)
+        PRIMARY_DEPLOYMENT="$(
+          yq ea -r 'select(.kind=="Deployment") | .metadata.name' /tmp/kustomize-output.yaml | head -1 || true
+        )"
+
+        # Emit outputs
+        printf "namespace=%s\n" "$NAMESPACE" >> "$GITHUB_OUTPUT"
+        printf "workloads_json=%s\n" "$WORKLOADS_JSON" >> "$GITHUB_OUTPUT"
+        printf "primary_deployment=%s\n" "${PRIMARY_DEPLOYMENT:-}" >> "$GITHUB_OUTPUT"
+
+        # Human-friendly summary
+        echo "📋 Inspection Summary:"
+        echo "  Namespace: $NAMESPACE"
+        echo "  Primary Deployment: ${PRIMARY_DEPLOYMENT:-none}"
+        echo "  Workloads:"
+        echo "$WORKLOADS_JSON" | yq -p=json -r '.[] | "    - \(.kind)/\(.name) (ns: \(.namespace))"' || true
