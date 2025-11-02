@@ -14,7 +14,7 @@ Extract metadata from kustomize overlays without making any changes.
 
 ```yaml
 - name: Inspect kustomization
-  uses: KoalaOps/kustomize-inspect@v1
+  uses: skyhook-io/kustomize-inspect@v1
   id: inspect
   with:
     overlay_dir: deploy/overlays/production
@@ -44,7 +44,7 @@ Extract metadata from kustomize overlays without making any changes.
 ### Basic inspection
 ```yaml
 - name: Inspect overlay
-  uses: KoalaOps/kustomize-inspect@v1
+  uses: skyhook-io/kustomize-inspect@v1
   id: inspect
   with:
     overlay_dir: deploy/overlays/staging
@@ -53,7 +53,7 @@ Extract metadata from kustomize overlays without making any changes.
 ### Parse workloads
 ```yaml
 - name: Inspect overlay
-  uses: KoalaOps/kustomize-inspect@v1
+  uses: skyhook-io/kustomize-inspect@v1
   id: inspect
   with:
     overlay_dir: deploy/overlays/production
@@ -66,7 +66,7 @@ Extract metadata from kustomize overlays without making any changes.
 ### Use with other actions
 ```yaml
 - name: Edit kustomization
-  uses: KoalaOps/kustomize-edit@v1
+  uses: skyhook-io/kustomize-edit@v1
   id: edit
   with:
     overlay_dir: deploy/overlays/production
@@ -74,13 +74,13 @@ Extract metadata from kustomize overlays without making any changes.
     tag: v1.2.3
 
 - name: Inspect changes
-  uses: KoalaOps/kustomize-inspect@v1
+  uses: skyhook-io/kustomize-inspect@v1
   id: inspect
   with:
     overlay_dir: ${{ steps.edit.outputs.overlay_dir }}
 
 - name: Apply to cluster
-  uses: KoalaOps/kustomize-apply@v1
+  uses: skyhook-io/kustomize-apply@v1
   with:
     overlay_dir: ${{ steps.edit.outputs.overlay_dir }}
     namespace: ${{ steps.inspect.outputs.namespace }}
@@ -89,7 +89,7 @@ Extract metadata from kustomize overlays without making any changes.
 ### Extract for commit message
 ```yaml
 - name: Inspect for metadata
-  uses: KoalaOps/kustomize-inspect@v1
+  uses: skyhook-io/kustomize-inspect@v1
   id: inspect
   with:
     overlay_dir: deploy/overlays/production

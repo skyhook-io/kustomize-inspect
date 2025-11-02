@@ -1,6 +1,6 @@
 name: 'Kustomize Inspect'
 description: 'Build and inspect a kustomize overlay to extract metadata'
-author: 'KoalaOps'
+author: 'Skyhook'
 
 branding:
   icon: 'search'
