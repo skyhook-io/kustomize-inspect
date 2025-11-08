@@ -1,4 +1,4 @@
-name: 'Kustomize Inspect'
+name: 'Skyhook Kustomize Inspect'
 description: 'Build and inspect a kustomize overlay to extract metadata'
 author: 'Skyhook'
 
