@@ -68,7 +68,8 @@ runs:
 
         # Prefer kustomization.yaml namespace; else first namespaced resource; else default
         KUSTOM_NS="$(yq -r '.namespace // ""' "$OVERLAY/kustomization.yaml" || true)"
-        BUILT_NS="$(yq ea -r 'select(has("metadata")) | .metadata.namespace // ""' /tmp/kustomize-output.yaml | grep -m1 . || true)"
+        # Only select resources that have .metadata.namespace (excludes Namespace resources which only have .metadata.name)
+        BUILT_NS="$(yq ea -r 'select(.metadata.namespace) | .metadata.namespace' /tmp/kustomize-output.yaml | grep -m1 . || true)"
         if [ -n "$KUSTOM_NS" ]; then
           NAMESPACE="$KUSTOM_NS"
         elif [ -n "$BUILT_NS" ]; then
