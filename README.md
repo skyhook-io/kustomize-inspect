@@ -30,6 +30,7 @@ Extract metadata from kustomize overlays without making any changes.
 | Input | Description | Required | Default |
 |-------|-------------|----------|---------|
 | `overlay_dir` | Path to kustomize overlay | ✅ | - |
+| `enable_helm` | Pass `--enable-helm` to `kustomize build` (required for overlays using `helmCharts:`). Requires `helm` binary on the runner; fails fast if missing. Set to `false` to skip. | ❌ | `true` |
 
 ## Outputs
 
