@@ -10,6 +10,10 @@ inputs:
   overlay_dir:
     description: 'Path to kustomize overlay directory'
     required: true
+  enable_helm:
+    description: 'Pass --enable-helm to kustomize build (requires helm binary on runner). When true, fails fast if helm is not installed.'
+    required: false
+    default: 'true'
 
 outputs:
   namespace:
@@ -35,6 +39,10 @@ runs:
             exit 1
           fi
         done
+        if [ "${{ inputs.enable_helm }}" = "true" ] && ! command -v helm >/dev/null 2>&1; then
+          echo "::error::enable_helm=true but 'helm' binary not found in PATH. Install helm or set enable_helm=false."
+          exit 1
+        fi
         echo "✅ Tools present: kustomize, yq"
 
     - name: Validate overlay directory
@@ -59,8 +67,13 @@ runs:
         set -euo pipefail
         OVERLAY="${{ inputs.overlay_dir }}"
 
-        echo "🔨 kustomize build: $OVERLAY"
-        if ! kustomize build "$OVERLAY" > /tmp/kustomize-output.yaml 2> /tmp/kustomize.err; then
+        KUSTOMIZE_FLAGS=()
+        if [ "${{ inputs.enable_helm }}" = "true" ]; then
+          KUSTOMIZE_FLAGS+=(--enable-helm)
+        fi
+        # Safe-expand possibly-empty array (bash 3.2 + set -u; macOS runners)
+        echo "🔨 kustomize build ${KUSTOMIZE_FLAGS[*]+${KUSTOMIZE_FLAGS[*]}}: $OVERLAY"
+        if ! kustomize build ${KUSTOMIZE_FLAGS[@]+"${KUSTOMIZE_FLAGS[@]}"} "$OVERLAY" > /tmp/kustomize-output.yaml 2> /tmp/kustomize.err; then
           echo "::error::kustomize build failed"
           sed -n '1,120p' /tmp/kustomize.err || true
           exit 1
